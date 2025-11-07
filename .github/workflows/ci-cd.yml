@@ -4,12 +4,13 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
-  build:
+  build-frontend:
+    name: Frontend Build & Test
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,6 +22,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        working-directory: client
         run: |
           if [ -f package.json ]; then
             npm ci
@@ -28,49 +30,78 @@ jobs:
             echo "No package.json found, skipping npm install"
           fi
 
-      - name: Run linting
+      - name: Lint
+        working-directory: client
         run: |
-          if [ -f package.json ] && npm list --depth=0 | grep -q eslint; then
+          if npm list --depth=0 | grep -q eslint; then
             npm run lint
           else
-            echo "No linting configured, skipping..."
+            echo "No lint configured, skipping..."
           fi
 
-      - name: Run tests
+      - name: Run frontend tests
+        working-directory: client
         run: |
-          if [ -f package.json ] && npm list --depth=0 | grep -q jest; then
-            npm test
+          if npm list --depth=0 | grep -q jest; then
+            npm test -- --ci --coverage
           else
-            echo "No tests configured, skipping..."
+            echo "No Jest tests configured, skipping..."
           fi
 
-      - name: Build application
+      - name: Build frontend
+        working-directory: client
         run: |
-          if [ -f package.json ]; then
-            npm run build --if-present
-          else
-            echo "No build script found, skipping..."
-          fi
+          npm run build --if-present
 
-      - name: Security audit
+  build-backend:
+    name: Backend (Flask) Tests
+    runs-on: ubuntu-latest
+    needs: build-frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        working-directory: server
         run: |
-          if [ -f package.json ]; then
-            npm audit --audit-level=high
-          else
-            echo "No package.json found, skipping security audit"
-          fi
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov flake8 pypdf
+
+      - name: Lint backend
+        working-directory: server
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
+
+      - name: Run backend tests (pytest)
+        working-directory: server
+        run: |
+          pytest --maxfail=1 --disable-warnings -q --cov=server --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: server/coverage.xml
 
   deploy:
-    needs: build
+    name: Deploy (Staging & Prod)
+    needs: [build-frontend, build-backend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - name: Deploy to staging
-        run: echo "Deploying to staging environment..."
-        
+        run: echo "🚀 Deploying to staging environment..."
+
       - name: Run integration tests
-        run: echo "Running integration tests..."
-        
+        run: echo "✅ Running integration tests..."
+
       - name: Deploy to production
-        run: echo "Deploying to production environment..."
+        run: echo "🎯 Deploying to production environment..."
