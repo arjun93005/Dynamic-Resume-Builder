@@ -1,25 +1,17 @@
-import os
-import time
+import os, time
 
+def ensure_upload_dir(directory):
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
-def ensure_upload_dir(folder="uploads"):
-    os.makedirs(folder, exist_ok=True)
-    return folder
+def save_file(file, upload_dir):
+    file_path = os.path.join(upload_dir, file.filename)
+    file.save(file_path)
+    return file_path
 
-
-def save_file(file, report_id, folder="uploads"):
-    ensure_upload_dir(folder)
-    ext = os.path.splitext(file.filename)[1] or ".bin"
-    path = os.path.join(folder, f"{report_id}{ext}")
-    file.save(path)
-    return path
-
-
-def cleanup_old_files(folder="uploads", hours=12):
-    if not os.path.exists(folder):
-        return
+def cleanup_old_files(directory, age_limit_minutes=5):
     now = time.time()
-    for f in os.listdir(folder):
-        path = os.path.join(folder, f)
-        if os.path.getmtime(path) < now - hours * 3600:
+    for f in os.listdir(directory):
+        path = os.path.join(directory, f)
+        if os.path.isfile(path) and now - os.path.getmtime(path) > age_limit_minutes * 60:
             os.remove(path)
