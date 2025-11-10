@@ -1,84 +1,96 @@
 import os
 import uuid
 from typing import Dict, Any
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 import werkzeug
-# Some test environments expect werkzeug.__version__ to exist
+# 🧩 Fix for Werkzeug 3.x not having __version__ — needed for Flask test client
 if not hasattr(werkzeug, "__version__"):
-    werkzeug.__version__ = "3.0"
+    werkzeug.__version__ = "3.0.0"
 
-from flask import Flask, jsonify, request
+from server.services.parser import extract_text
+from server.services.storage_local import ensure_upload_dir, save_file, cleanup_old_files
+from server.services.section_extractor import extract_sections
+from server.services.pdf_exporter import export_to_pdf
 
 # -----------------------------------------------------------------------------
 # App setup
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
+CORS(app)
 
-# Simple in-memory store just for tests
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+ensure_upload_dir(UPLOAD_DIR)
+
 _RESULTS: Dict[str, Dict[str, Any]] = {}
 
-
-# -----------------------------------------------------------------------------
-# Security headers (must be defined at import time so tests see them)
 # -----------------------------------------------------------------------------
 @app.after_request
 def apply_security_headers(resp):
-    # Headers the tests look for
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    # Extra good practice
     resp.headers["X-Frame-Options"] = "DENY"
     return resp
 
 
-# -----------------------------------------------------------------------------
-# Routes
-# -----------------------------------------------------------------------------
 @app.route("/", methods=["GET"])
 def root():
-    # A simple OK endpoint the security test can call
     return jsonify({"status": "ok"}), 200
 
 
 @app.route("/api/resume/analyze", methods=["POST"])
 def analyze_resume():
-    """
-    Accepts a multipart form with a 'file' field.
-    Returns a JSON object with a generated reportId.
-    """
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
 
-    _file = request.files["file"]
-    # We don’t need to persist anything for the tests; just simulate an analysis
-    report_id = uuid.uuid4().hex
+        file = request.files["file"]
+        if not file.filename:
+            return jsonify({"error": "Empty filename"}), 400
 
-    # Stash a dummy result so /api/resume/result/<id> can return 200
-    _RESULTS[report_id] = {
-        "filename": getattr(_file, "filename", None),
-        "status": "done",
-        "summary": "Mock analysis completed for test.",
-    }
+        ensure_upload_dir(UPLOAD_DIR)
+        file_path = save_file(file, UPLOAD_DIR)
 
-    return jsonify({"reportId": report_id}), 200
+        resume_text = extract_text(file_path)
+        extracted_sections = extract_sections(resume_text)
+
+        report_id = uuid.uuid4().hex
+        _RESULTS[report_id] = {
+            "filename": file.filename,
+            "status": "done",
+            "sections": extracted_sections,
+        }
+
+        cleanup_old_files(UPLOAD_DIR)
+
+        return jsonify({
+            "reportId": report_id,
+            "filename": file.filename,
+            "sections": extracted_sections
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 
 @app.route("/api/resume/result/<report_id>", methods=["GET"])
 def get_result(report_id: str):
-    """
-    Returns the stored (mock) result. Tests only assert 200 status,
-    but we return a simple payload for completeness.
-    """
     result = _RESULTS.get(report_id)
     if not result:
-        # Still return 200 to keep tests simple, but indicate not found in payload
         return jsonify({"reportId": report_id, "status": "unknown"}), 200
     return jsonify({"reportId": report_id, **result}), 200
 
 
-# -----------------------------------------------------------------------------
-# Error handlers (optional, but keep responses JSON-y)
-# -----------------------------------------------------------------------------
+@app.route("/api/resume/export/<report_id>", methods=["GET"])
+def export_resume_report(report_id: str):
+    result = _RESULTS.get(report_id)
+    if not result:
+        return jsonify({"error": "Report not found"}), 404
+
+    pdf_path = export_to_pdf(result, output_path=os.path.join(UPLOAD_DIR, f"{report_id}.pdf"))
+    return jsonify({"pdf_path": pdf_path}), 200
+
+
 @app.errorhandler(404)
 def not_found(_e):
     return jsonify({"error": "Not found"}), 404
@@ -89,13 +101,9 @@ def server_error(_e):
     return jsonify({"error": "Internal server error"}), 500
 
 
-# -----------------------------------------------------------------------------
-# Local dev entrypoint
-# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(
         host=os.environ.get("HOST", "0.0.0.0"),
         port=int(os.environ.get("PORT", "5000")),
         debug=True,
     )
-
