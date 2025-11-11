@@ -17,6 +17,7 @@ from server.services.storage_local import ensure_upload_dir, save_file, cleanup_
 from server.services.section_extractor import extract_sections
 from server.services.pdf_exporter import export_to_pdf
 from server.services.section_extractor import extract_sections, detect_missing_sections
+from server.services.score_calculator import compute_resume_score
 
 # -----------------------------------------------------------------------------
 # App setup
@@ -45,33 +46,50 @@ def root():
 
 @app.route("/api/resume/analyze", methods=["POST"])
 def analyze_resume():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "Empty filename"}), 400
+
+    ensure_upload_dir(UPLOAD_DIR)
+    file_path = save_file(file, UPLOAD_DIR)
+
+    # --- ✅ New corruption-safe extraction ---
     try:
-        if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
+        resume_text = extract_text(file_path)
+        if not resume_text.strip():
+            raise ValueError("Empty or unreadable file content")
+    except (ValueError, Exception) as e:
+        return jsonify({
+            "error": "File could not be processed",
+            "details": str(e)
+        }), 422
 
-        file = request.files["file"]
-        if not file.filename:
-            return jsonify({"error": "Empty filename"}), 400
-
-        ensure_upload_dir(UPLOAD_DIR)
-        file_path = save_file(file, UPLOAD_DIR)
-
-        try:
-            resume_text = extract_text(file_path)
-        except ValueError as e:
-            return jsonify({
-                "error": "File could not be processed",
-                "details": str(e)
-            }), 422
-        
+    # Continue normal flow only if extraction successful
+    try:
         extracted_sections = extract_sections(resume_text)
         missing_sections = detect_missing_sections(extracted_sections)
+        char_count = len(resume_text)
+        word_count = len([w for w in resume_text.split() if w.strip()])
+
+        metadata = {
+            "filename": file.filename,
+            "file_type": os.path.splitext(file.filename)[1].replace(".", "").upper() or "UNKNOWN",
+            "character_count": char_count,
+            "word_count": word_count,
+        }
+
+        score_result = compute_resume_score(extracted_sections, metadata)
 
         report_id = uuid.uuid4().hex
         _RESULTS[report_id] = {
             "filename": file.filename,
             "status": "done",
             "sections": extracted_sections,
+            "metadata": metadata,
+            "score": score_result,
             "missing_sections": missing_sections,
         }
 
@@ -81,8 +99,11 @@ def analyze_resume():
             "reportId": report_id,
             "filename": file.filename,
             "sections": extracted_sections,
+            "metadata": metadata,
+            "score": score_result,
             "missing_sections": missing_sections
         }), 200
+
     except Exception as e:
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 

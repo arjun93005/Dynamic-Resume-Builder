@@ -1,14 +1,15 @@
+// client/src/components/SectionCards.jsx
 import React from "react";
 
 export default function SectionCards({ section, json }) {
   if (!json) return <div className="placeholder">Upload a resume to view extracted details.</div>;
 
-  const data = json.sections || {}; // ✅ Correct key fix
+  const data = json.sections || {};
 
   const renderContact = () => {
     const c = data.contact_info || {};
     return (
-      <div>
+      <div className="json-view">
         <p><strong>Email:</strong> {c.email || "—"}</p>
         <p><strong>Phone:</strong> {c.phone || "—"}</p>
         <p><strong>LinkedIn:</strong> {c.linkedin || "—"}</p>
@@ -26,22 +27,20 @@ export default function SectionCards({ section, json }) {
   );
 
   const renderProjects = () => (
-    <div className="json-view">Project parsing (coming soon)</div>
+    <div className="json-view">Project extraction coming soon.</div>
   );
 
   const renderCertifications = () => (
-    <div className="json-view">Certification parsing (coming soon)</div>
+    <div className="json-view">Certification extraction coming soon.</div>
   );
 
   const renderSkills = () => {
     const s = data.skills || [];
     return (
       <ul className="skills-list">
-        {s.length > 0 ? (
-          s.map((skill, i) => <li key={i}>{skill}</li>)
-        ) : (
-          <li>—</li>
-        )}
+        {s.length > 0
+          ? s.map((skill, i) => <li key={i}>{skill}</li>)
+          : <li>—</li>}
       </ul>
     );
   };
@@ -56,4 +55,3 @@ export default function SectionCards({ section, json }) {
     default: return <div className="placeholder">Select a section to view data.</div>;
   }
 }
-

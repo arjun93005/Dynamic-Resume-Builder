@@ -1,3 +1,4 @@
+// client/src/App.jsx
 import React, { useState } from "react";
 import UploadHero from "./components/UploadHero";
 import SectionCards from "./components/SectionCards";
@@ -16,79 +17,86 @@ export default function App() {
           <h1>Dynamic Resume Analyzer</h1>
           <p>Upload a resume to extract key information and view details by section.</p>
 
+          {/* Upload Component */}
           <UploadHero onJson={(d) => setJsonData(d)} />
 
-          {/* Score & Recommendations placeholders */}
-          <div className="cards">
-            <div className="card placeholder-card">Score (coming soon)</div>
-            <div className="card placeholder-card">Recommendations (coming soon)</div>
-          </div>
-
-          {/* File Metadata */}
+          {/* Only show cards after analysis */}
           {jsonData && (
-            <div className="meta-card">
-              <div className="meta-grid">
-                <div>
-                  <h3>File Metadata</h3>
-                  <p><strong>Filename:</strong> {jsonData.filename || "—"}</p>
-                  <p><strong>Status:</strong> {jsonData.status || "done"}</p>
+            <>
+              {/* Score + Recommendations */}
+              <div className="cards">
+                {/* ✅ Resume Score */}
+                <div className="card">
+                  <h3>Resume Quality Score</h3>
+                  <p className="text-4xl font-bold text-orange-600 mt-2">
+                    {jsonData.score?.score ?? "—"}/100
+                  </p>
+                  {jsonData.score?.notes?.length > 0 && (
+                    <ul className="list-disc list-inside text-sm mt-3 text-gray-600">
+                      {jsonData.score.notes.slice(0, 2).map((n, i) => (
+                        <li key={i}>{n}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div>
-                  <p><strong>File Type:</strong> {getFileType(jsonData.filename)}</p>
-                  <p><strong>Word Count:</strong> {countWords(jsonData.sections)}</p>
-                  <p><strong>Character Count:</strong> {countChars(jsonData.sections)}</p>
+
+                {/* Recommendations placeholder */}
+                <div className="card placeholder-card">
+                  Recommendations (coming soon)
                 </div>
               </div>
 
-              {/* 🚨 Missing Sections Banner */}
-              {jsonData.missing_sections && jsonData.missing_sections.length > 0 && (
-                <div className="missing-banner">
-                  ⚠️ <strong>Missing sections detected:</strong>{" "}
-                  {jsonData.missing_sections.join(", ")}
+              {/* File Metadata */}
+              <div className="meta-card">
+                <div className="meta-grid">
+                  <div>
+                    <h3>File Metadata</h3>
+                    <p><strong>Filename:</strong> {jsonData.metadata?.filename}</p>
+                    <p><strong>Status:</strong> {jsonData.status || "done"}</p>
+                  </div>
+                  <div>
+                    <p><strong>File Type:</strong> {jsonData.metadata?.file_type}</p>
+                    <p><strong>Word Count:</strong> {jsonData.metadata?.word_count}</p>
+                    <p><strong>Character Count:</strong> {jsonData.metadata?.character_count}</p>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* ⚠️ Missing Sections */}
+                {jsonData.missing_sections?.length > 0 && (
+                  <div className="missing-banner mt-3">
+                    ⚠️ <strong>Missing sections detected:</strong>{" "}
+                    {jsonData.missing_sections.join(", ")}
+                  </div>
+                )}
+              </div>
+
+              {/* Section Tabs */}
+              <div className="tabs">
+                {sections.map((tab) => (
+                  <div
+                    key={tab}
+                    className={`tab ${activeSection === tab ? "active" : ""}`}
+                    onClick={() => setActiveSection(tab)}
+                  >
+                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  </div>
+                ))}
+              </div>
+
+              {/* Section Data */}
+              <div className="section-content">
+                <SectionCards section={activeSection} json={jsonData} />
+              </div>
+            </>
           )}
 
-
-          {/* Section Tabs */}
-          <div className="tabs">
-            {sections.map((tab) => (
-              <div
-                key={tab}
-                className={`tab ${activeSection === tab ? "active" : ""}`}
-                onClick={() => setActiveSection(tab)}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </div>
-            ))}
-          </div>
-
-          {/* Section Content */}
-          <div className="section-content">
-            <SectionCards section={activeSection} json={jsonData} />
-          </div>
+          {!jsonData && (
+            <div className="placeholder">
+              Upload a resume to begin analysis.
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
-}
-
-// Helper utilities
-function getFileType(filename = "") {
-  if (!filename) return "—";
-  const ext = filename.split(".").pop().toUpperCase();
-  return ext || "—";
-}
-
-function countWords(sections) {
-  if (!sections) return 0;
-  const text = Object.values(sections).join(" ");
-  return text.trim().split(/\s+/).length;
-}
-
-function countChars(sections) {
-  if (!sections) return 0;
-  const text = Object.values(sections).join(" ");
-  return text.length;
 }
