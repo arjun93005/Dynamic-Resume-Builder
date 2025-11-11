@@ -1,5 +1,6 @@
 import pytest
 from server.services.section_extractor import extract_sections
+from server.services.section_extractor import detect_missing_sections
 
 @pytest.fixture
 def sample_resume_text():
@@ -45,3 +46,27 @@ def test_skills_extraction(sample_resume_text):
     skills = extract_sections(sample_resume_text)["skills"]
     assert "Python" in skills
     assert "React" in skills
+
+
+def test_detect_missing_sections_all_present():
+    data = {
+        "contact_info": {"email": "test@test.com"},
+        "education": "B.Tech at PES",
+        "experience": "2 years internship",
+        "skills": ["Python", "ML"]
+    }
+    missing = detect_missing_sections(data)
+    assert missing == []
+
+def test_detect_missing_sections_some_missing():
+    data = {
+        "contact_info": {},
+        "education": "",
+        "experience": "Worked on project",
+        "skills": []
+    }
+    missing = detect_missing_sections(data)
+    assert "contact_info" in missing
+    assert "education" in missing
+    assert "skills" in missing
+    assert "experience" not in missing
