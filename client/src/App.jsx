@@ -39,8 +39,17 @@ export default function App() {
                   <p><strong>Character Count:</strong> {countChars(jsonData.sections)}</p>
                 </div>
               </div>
+
+              {/* 🚨 Missing Sections Banner */}
+              {jsonData.missing_sections && jsonData.missing_sections.length > 0 && (
+                <div className="missing-banner">
+                  ⚠️ <strong>Missing sections detected:</strong>{" "}
+                  {jsonData.missing_sections.join(", ")}
+                </div>
+              )}
             </div>
           )}
+
 
           {/* Section Tabs */}
           <div className="tabs">
