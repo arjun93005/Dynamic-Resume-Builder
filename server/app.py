@@ -13,6 +13,7 @@ from server.services.parser import extract_text
 from server.services.storage_local import ensure_upload_dir, save_file, cleanup_old_files
 from server.services.section_extractor import extract_sections
 from server.services.pdf_exporter import export_to_pdf
+from server.services.section_extractor import extract_sections, detect_missing_sections
 
 # -----------------------------------------------------------------------------
 # App setup
@@ -54,12 +55,14 @@ def analyze_resume():
 
         resume_text = extract_text(file_path)
         extracted_sections = extract_sections(resume_text)
+        missing_sections = detect_missing_sections(extracted_sections)
 
         report_id = uuid.uuid4().hex
         _RESULTS[report_id] = {
             "filename": file.filename,
             "status": "done",
             "sections": extracted_sections,
+            "missing_sections": missing_sections,
         }
 
         cleanup_old_files(UPLOAD_DIR)
@@ -67,7 +70,8 @@ def analyze_resume():
         return jsonify({
             "reportId": report_id,
             "filename": file.filename,
-            "sections": extracted_sections
+            "sections": extracted_sections,
+            "missing_sections": missing_sections
         }), 200
     except Exception as e:
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
