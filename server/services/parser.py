@@ -2,6 +2,10 @@ import os
 from docx import Document
 from pypdf import PdfReader
 
+"""
+Enhanced parser with built-in corrupted file detection.
+Implements SRS DRA-F-004 requirement.
+"""
 def extract_text(path: str) -> str:
     """
     Extract text from PDF/DOCX/TXT files with corruption handling.
