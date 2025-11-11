@@ -192,3 +192,20 @@ p { color: var(--muted); margin-bottom: 18px; }
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* 🔴 Error Banner for Corrupted Files */
+.error-banner {
+  background: #ffeaea;
+  border: 1px solid #ffb3b3;
+  color: #7a0000;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.08);
+  animation: fadeDown 0.3s ease;
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
