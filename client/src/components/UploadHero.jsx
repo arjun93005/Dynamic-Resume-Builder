@@ -1,3 +1,4 @@
+// Handles US 1.4 Frontend - Corrupted File Handling UI banner and retry feature
 import React, { useState } from "react";
 
 export default function UploadHero() {
