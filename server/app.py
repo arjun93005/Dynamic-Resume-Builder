@@ -56,7 +56,14 @@ def analyze_resume():
         ensure_upload_dir(UPLOAD_DIR)
         file_path = save_file(file, UPLOAD_DIR)
 
-        resume_text = extract_text(file_path)
+        try:
+            resume_text = extract_text(file_path)
+        except ValueError as e:
+            return jsonify({
+                "error": "File could not be processed",
+                "details": str(e)
+            }), 422
+        
         extracted_sections = extract_sections(resume_text)
         missing_sections = detect_missing_sections(extracted_sections)
 
