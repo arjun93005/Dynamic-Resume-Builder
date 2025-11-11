@@ -66,3 +66,17 @@ def extract_sections(text: str) -> dict:
         "experience": experience,
         "skills": skills,
     }
+
+def detect_missing_sections(sections: dict) -> list:
+    """
+    Detects which critical sections are missing from a resume.
+    """
+    required = ["contact_info", "education", "experience", "skills"]
+    missing = []
+
+    for key in required:
+        value = sections.get(key)
+        if not value or (isinstance(value, str) and not value.strip()) or (isinstance(value, list) and len(value) == 0):
+            missing.append(key)
+
+    return missing
